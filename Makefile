@@ -5,12 +5,13 @@ GTEST_HEADERS = $(GTEST_DIR)/include/gtest/*.h \
 GTEST_SRCS_ = $(GTEST_DIR)/src/*.cc $(GTEST_DIR)/src/*.h $(GTEST_HEADERS)
 
 OUT_DIR = bin
+EXAMPLES_DIR = examples
 TESTS_DIR = tests
 
 CXXFLAGS += -std=c++11 -pthread
 CXXFLAGS += -isystem $(GTEST_DIR)/include -I.
 
-EXAMPLES = 
+EXAMPLES = simple_example
 TESTS = generator_unittest
 
 # Function to create output diretory
@@ -20,6 +21,15 @@ achieve_all = $(AR) $(ARFLAGS) $(OUT_DIR)/$@ $(addprefix $(OUT_DIR)/,$^)
 default: all
 
 all: $(EXAMPLES) $(TESTS)
+
+simple_example: simple_example.o
+	$(create_bin)
+	$(CXX) $(CXXFLAGS) $(addprefix $(OUT_DIR)/, $^) -o $(OUT_DIR)/$@
+
+simple_example.o: $(EXAMPLES_DIR)/simple_example.cpp $(GTEST_HEADERS) \
+				  generator.h
+	$(create_bin)
+	$(CXX) $(CXXFLAGS) -c $(EXAMPLES_DIR)/simple_example.cpp -o $(OUT_DIR)/$@
 
 generator_unittest: generator_unittest.o gtest_main.a
 	$(create_bin)
