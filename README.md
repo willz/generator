@@ -22,7 +22,11 @@ First, Define a class inherits GeneratorCore, and implement a public generate() 
 	
 Second, Create the generator via Generator template. e.x.
 
-	Geneorator<SomeInt>()
+	for (auto i : Geneorator<SomeInt>()) {
+		std::cout << i << ", ";
+	}
+	
+	will output:    1, 3, 
 
 
 How to Compile
