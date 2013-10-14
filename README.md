@@ -3,6 +3,10 @@ generator
 
 Provide python-style generator(yield) for C++ 11
 
+Requirements
+------------
+This library is implemented using boost::context and C++ 11's new feature variadic template. So first you should have boost::context installed and use a complier that supports c++ 11.
+
 Examples
 --------
 Read examples/simple_example.cpp first, which implements a int generator and a token generator
@@ -31,5 +35,5 @@ Second, Create the generator via Generator template. e.x.
 
 How to Compile
 --------------
-Only the generator.h file is needed for the generator library. It is implemented using c++ 11 features and thread. So to compile, using options
-	-std=c++11 -pthread
+Only the generator.h file is needed for the generator library. And using options -std=c++11 -lboost_context
+
