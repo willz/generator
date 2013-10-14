@@ -8,7 +8,7 @@ OUT_DIR = bin
 EXAMPLES_DIR = examples
 TESTS_DIR = tests
 
-CXXFLAGS += -std=c++11 -pthread
+CXXFLAGS += -std=c++11 -lboost_context -pthread
 CXXFLAGS += -isystem $(GTEST_DIR)/include -I.
 
 EXAMPLES = simple_example
@@ -24,31 +24,31 @@ all: $(EXAMPLES) $(TESTS)
 
 simple_example: simple_example.o
 	$(create_bin)
-	$(CXX) $(CXXFLAGS) $(addprefix $(OUT_DIR)/, $^) -o $(OUT_DIR)/$@
+	$(CXX) $(addprefix $(OUT_DIR)/, $^) -o $(OUT_DIR)/$@ $(CXXFLAGS)
 
 simple_example.o: $(EXAMPLES_DIR)/simple_example.cpp $(GTEST_HEADERS) \
 				  generator.h
 	$(create_bin)
-	$(CXX) $(CXXFLAGS) -c $(EXAMPLES_DIR)/simple_example.cpp -o $(OUT_DIR)/$@
+	$(CXX) -c $(EXAMPLES_DIR)/simple_example.cpp -o $(OUT_DIR)/$@ $(CXXFLAGS)
 
 generator_unittest: generator_unittest.o gtest_main.a
 	$(create_bin)
-	$(CXX) $(CXXFLAGS) $(addprefix $(OUT_DIR)/, $^) -o $(OUT_DIR)/$@
+	$(CXX) $(addprefix $(OUT_DIR)/, $^) -o $(OUT_DIR)/$@ $(CXXFLAGS)
 
 generator_unittest.o: $(TESTS_DIR)/generator_unittest.cpp $(GTEST_HEADERS) \
 					  generator.h
 	$(create_bin)
-	$(CXX) $(CXXFLAGS) -c $(TESTS_DIR)/generator_unittest.cpp -o $(OUT_DIR)/$@
+	$(CXX) -c $(TESTS_DIR)/generator_unittest.cpp -o $(OUT_DIR)/$@ $(CXXFLAGS)
 
 gtest-all.o : $(GTEST_SRCS_)
 	$(create_bin)
-	$(CXX) -I$(GTEST_DIR) $(CXXFLAGS) -c \
-            $(GTEST_DIR)/src/gtest-all.cc -o $(OUT_DIR)/$@
+	$(CXX) -I$(GTEST_DIR) -c \
+            $(GTEST_DIR)/src/gtest-all.cc -o $(OUT_DIR)/$@ $(CXXFLAGS)
 
 gtest_main.o : $(GTEST_SRCS_)
 	$(create_bin)
-	$(CXX) -I$(GTEST_DIR) $(CXXFLAGS) -c \
-            $(GTEST_DIR)/src/gtest_main.cc -o $(OUT_DIR)/$@
+	$(CXX) -I$(GTEST_DIR) -c \
+            $(GTEST_DIR)/src/gtest_main.cc -o $(OUT_DIR)/$@ $(CXXFLAGS)
 
 gtest.a : gtest-all.o
 	$(create_bin)

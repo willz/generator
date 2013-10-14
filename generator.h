@@ -1,9 +1,10 @@
 #ifndef INCLUDED_GENERATOR_H
 #define INCLUDED_GENERATOR_H
 
-#include <mutex>
-#include <thread>
-#include <condition_variable>
+#include <functional>
+#include <exception>
+#include <array>
+#include <boost/context/all.hpp>
 
 // Support iterator opoeration
 template<typename T>
@@ -45,24 +46,20 @@ public:
     template<typename Core>
     friend class Generator;
 
-    GeneratorCore() : _has_product(true) { }
+    GeneratorCore() { }
     virtual ~GeneratorCore() { }
 
-    // Item will be produced only when there is no item, if there exists
-    // one item, yield() will wait until that item is consumed
+protected:
     void yield(T product) {
-        std::unique_lock<std::mutex> lck(_mtx);
-        _cv.wait(lck, [&] () { return !_has_product; });
         _product = product;
-        _has_product = true;
-        _cv.notify_one();
+        // switch back to the main context
+        boost::context::jump_fcontext(_child_ctx, _main_ctx, 0);
     }
 
 private:
     T _product;
-    std::mutex _mtx;
-    std::condition_variable _cv;
-    bool _has_product;
+    boost::context::fcontext_t* _child_ctx;
+    boost::context::fcontext_t* _main_ctx;
 };
 
 template<typename Core>
@@ -70,47 +67,35 @@ class Generator {
 public:
     typedef typename Core::Output Output;
     template<typename... ARGS>
-    Generator(ARGS... args) : _mtx(_producer._mtx), _cv(_producer._cv),
-                              _done(false) {
-        auto callback = std::bind([&] (Generator<Core>* gen, ARGS... args) {
-                                  gen->_thread_wrapper(args...);},
+    Generator(ARGS... args) :  _done(false) {
+        _callback = std::bind([&] (Generator<Core>* gen, ARGS... args) {
+                                  gen->_generate_wrapper(args...);},
                                   this, args...);
-        _gen_thread = new std::thread(callback);
+        // the _child_ctx returned is created on the new stack, so no need
+        // to delete it.
+        _child_ctx = boost::context::make_fcontext(
+                        _stack.data() + _stack.size(),
+                        _stack.size(),
+                        &Generator<Core>::_c_function_wrapper);
+        _producer._main_ctx = &_main_ctx;
+        _producer._child_ctx = _child_ctx;
         ++(*this);
     }
 
-    ~Generator() {
-        _gen_thread->join();
-        delete _gen_thread;
-    }
+    // forbid copy constructor
+    Generator(const Generator<Core>&) = delete;
 
-    template<typename... ARGS>
-    void _thread_wrapper(ARGS... args) {
-        _producer.generate(args...);
-        std::unique_lock<std::mutex> lck(_mtx);
-        // wait is needed here. If the final item hasn't been consumed and
-        // end the producer thread. The comsumer thread(++ operator) will wait
-        // and never be notified.
-        _cv.wait(lck, [&] () { return !_producer._has_product; });
-        _done = true;
-        _cv.notify_one();
-    }
-
-    // By using condition variable, we make the two thread run like:
-    // ++, yield, ++, yield, ...
-    // In order to make the ++ run before producing the first item,
-    // _has_output was init to true, so that even though yield thread
-    // goes faster, it will wait until _has_ouput set to false
+    // NOTE: throw exception when there is exception in generate function
     Generator<Core>& operator ++ () {
-        std::unique_lock<std::mutex> lck(_mtx);
-        _producer._has_product = false;
-        _cv.notify_one();
-        _cv.wait(lck, [&] () { return _producer._has_product || _done; });
+        // switch to child context
+        boost::context::jump_fcontext(&_main_ctx, _child_ctx, (intptr_t)this);
+        if (_exception) {
+            std::rethrow_exception(_exception);
+        }
         return *this;
     }
 
     Output operator * () {
-        std::unique_lock<std::mutex> lck(_mtx);
         return _producer._product;
     }
 
@@ -128,11 +113,32 @@ public:
     }
 
 private:
+    template<typename... ARGS>
+    void _generate_wrapper(ARGS... args) {
+        try {
+            _producer.generate(args...);
+            _done = true;
+            boost::context::jump_fcontext(_child_ctx, &_main_ctx, 0);
+        } catch (...) {
+            _exception = std::current_exception();
+            boost::context::jump_fcontext(_child_ctx, &_main_ctx, 0);
+        }
+    }
+
+    // Need this function wrapper because make_fcontext only accept c style
+    // function pointer void(intptr_t)
+    static void _c_function_wrapper(intptr_t param) {
+        Generator<Core>* _this = reinterpret_cast<Generator<Core>*>(param);
+        (_this->_callback)();
+    }
+
     Core _producer;
-    std::mutex& _mtx;
-    std::condition_variable& _cv;
-    std::thread* _gen_thread;
+    std::array<intptr_t, 64 * 1024> _stack;
+    std::function<void(void)> _callback;
+    boost::context::fcontext_t* _child_ctx;
+    boost::context::fcontext_t _main_ctx;
     bool _done;
+    std::exception_ptr _exception;
 };
 
 #endif

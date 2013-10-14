@@ -30,6 +30,27 @@ public:
     }
 };
 
+// Test exception
+struct GeneratorException : public std::exception {
+    const char* what() const noexcept { return "generate exception\n"; }
+};
+
+class BasicExceptionTestGen : public GeneratorCore<int> {
+public:
+    void generate() {
+        throw GeneratorException{};
+    }
+};
+
+class MoreExceptionTestGen : public GeneratorCore<int> {
+public:
+    void generate() {
+        yield(1);
+        yield(2);
+        throw GeneratorException{};
+    }
+};
+
 class GeneratorTest : public testing::Test {
 protected:
     virtual void SetUp() {
@@ -64,4 +85,17 @@ TEST_F(GeneratorTest, OrderTest) {
         ++j;
     }
     EXPECT_EQ(j, 100);
+}
+
+TEST_F(GeneratorTest, BasicExceptionTest) {
+    EXPECT_THROW(Generator<BasicExceptionTestGen>{}, GeneratorException);
+}
+    
+TEST_F(GeneratorTest, MoreExceptionTest) {
+    Generator<MoreExceptionTestGen> gen{};
+    auto it = gen.begin();
+    EXPECT_EQ(*it, 1);
+    ++it;
+    EXPECT_EQ(*it, 2);
+    EXPECT_THROW(++it, GeneratorException);
 }

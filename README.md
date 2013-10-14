@@ -9,11 +9,11 @@ Read examples/simple_example.cpp first, which implements a int generator and a t
 
 How to Use
 ----------
-First, Define a class inherits GeneratorCore, and implement a public generate() method. e.x.
+First, Define a class inherits GeneratorCore, and implement a public generate(<whatever params you need>) method. e.x.
 
 	class SomeInt : public GeneratorCore<int> {
 	public:
-		void generate() {
+		void generate(<whatever params you need>) {
 			yield(1);
 			yield(3);
 			...
